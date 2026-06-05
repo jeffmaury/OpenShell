@@ -49,7 +49,7 @@ env:
 
 defaults:
   run:
-    shell: bash
+    shell: pwsh
 
 jobs:
   rust-windows-cli-build:
@@ -76,29 +76,27 @@ jobs:
       - name: Resolve build target
         id: target
         run: |
-          set -euo pipefail
+          $ErrorActionPreference = 'Stop'
 
-          crate=openshell-cli
-          binary=openshell
+          $crate = "openshell-cli"
+          $binary = "openshell"
 
-          case "$ARCH" in
-            x64)
-              target=x86_64-pc-windows-msvc
-              ;;
-            arm64)
-              target=aarch64-pc-windows-msvc
-              ;;
-            *)
-              echo "unsupported arch: $ARCH" >&2
+          switch ($env:ARCH) {
+            "x64" {
+              $target = "x86_64-pc-windows-msvc"
+            }
+            "arm64" {
+              $target = "aarch64-pc-windows-msvc"
+            }
+            default {
+              Write-Error "unsupported arch: $env:ARCH"
               exit 1
-              ;;
-          esac
+            }
+          }
 
-          {
-            echo "crate=$crate"
-            echo "binary=$binary"
-            echo "target=$target"
-          } >> "$GITHUB_OUTPUT"
+          "crate=$crate" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "binary=$binary" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "target=$target" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Cache Rust target and registry
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
@@ -116,23 +114,24 @@ jobs:
 
       - name: Compute cargo version
         id: version
-        shell: bash
         run: |
-          set -euo pipefail
-          if [[ -n "${{ inputs['cargo-version'] }}" ]]; then
-            echo "cargo_version=${{ inputs['cargo-version'] }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "cargo_version=$(uv run python tasks/scripts/release.py get-version --cargo)" >> "$GITHUB_OUTPUT"
-          fi
+          $ErrorActionPreference = 'Stop'
+          if ("${{ inputs['cargo-version'] }}" -ne "") {
+            "cargo_version=${{ inputs['cargo-version'] }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            $version = uv run python tasks/scripts/release.py get-version --cargo
+            "cargo_version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
 
       - name: Patch workspace version
         if: steps.version.outputs.cargo_version != ''
-        shell: bash
         run: |
-          set -euo pipefail
-          # Use sed compatible with both GNU and BSD (via git bash on Windows)
-          sed -i.bak -E '/^\[workspace\.package\]/,/^\[/{s/^version[[:space:]]*=[[:space:]]*".*"/version = "'"${{ steps.version.outputs.cargo_version }}"'"/}' Cargo.toml
-          rm -f Cargo.toml.bak
+          $ErrorActionPreference = 'Stop'
+          $content = Get-Content Cargo.toml -Raw
+          $version = "${{ steps.version.outputs.cargo_version }}"
+          # Replace version in [workspace.package] section
+          $content = $content -replace '(?ms)(\[workspace\.package\].*?)^version\s*=\s*"[^"]*"', "`$1version = `"$version`""
+          Set-Content -Path Cargo.toml -Value $content -NoNewline
 
       - name: Add Rust target
         run: rustup target add ${{ steps.target.outputs.target }}
@@ -143,41 +142,46 @@ jobs:
           # z3 needs C++ standard library on Windows
           CXXSTDLIB: "msvc"
         run: |
-          set -euo pipefail
-          args=(
-            --release
-            --target "${{ steps.target.outputs.target }}"
-            -p "${{ steps.target.outputs.crate }}"
-            --bin "${{ steps.target.outputs.binary }}"
+          $ErrorActionPreference = 'Stop'
+          $args = @(
+            "build",
+            "--release",
+            "--target", "${{ steps.target.outputs.target }}",
+            "-p", "${{ steps.target.outputs.crate }}",
+            "--bin", "${{ steps.target.outputs.binary }}"
           )
-          if [[ -n "$FEATURES" ]]; then
-            args+=(--features "$FEATURES")
-          fi
-          if [[ -n "${{ steps.version.outputs.cargo_version }}" ]]; then
-            export GIT_DIR=/nonexistent
-          fi
-          cargo build "${args[@]}"
+          if ($env:FEATURES) {
+            $args += @("--features", $env:FEATURES)
+          }
+          if ("${{ steps.version.outputs.cargo_version }}" -ne "") {
+            $env:GIT_DIR = "/nonexistent"
+          }
+          & cargo $args
 
       - name: Verify packaged binary
-        shell: bash
         run: |
-          set -euo pipefail
-          BIN="target/${{ steps.target.outputs.target }}/release/${{ steps.target.outputs.binary }}.exe"
-          test -f "$BIN"
+          $ErrorActionPreference = 'Stop'
+          $bin = "target/${{ steps.target.outputs.target }}/release/${{ steps.target.outputs.binary }}.exe"
+          if (-not (Test-Path $bin)) {
+            Write-Error "Binary not found: $bin"
+            exit 1
+          }
           # Run --version to verify the binary works
-          OUTPUT="$("$BIN" --version)"
-          echo "$OUTPUT"
-          grep -q "^${{ steps.target.outputs.binary }} " <<<"$OUTPUT"
+          $output = & $bin --version
+          Write-Output $output
+          if ($output -notmatch "^${{ steps.target.outputs.binary }} ") {
+            Write-Error "Binary version output unexpected: $output"
+            exit 1
+          }
 
       - name: Stage binary for artifact
-        shell: bash
         run: |
-          set -euo pipefail
-          STAGE="prebuilt-binaries/$ARCH"
-          mkdir -p "$STAGE"
-          cp "target/${{ steps.target.outputs.target }}/release/${{ steps.target.outputs.binary }}.exe" \
-            "$STAGE/${{ steps.target.outputs.binary }}.exe"
-          ls -lh "$STAGE/"
+          $ErrorActionPreference = 'Stop'
+          $stage = "prebuilt-binaries/$env:ARCH"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item "target/${{ steps.target.outputs.target }}/release/${{ steps.target.outputs.binary }}.exe" `
+            -Destination "$stage/${{ steps.target.outputs.binary }}.exe"
+          Get-ChildItem $stage
 
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

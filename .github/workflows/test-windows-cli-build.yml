@@ -38,29 +38,31 @@ jobs:
       build-arm64: ${{ steps.check.outputs.build-arm64 }}
     steps:
       - id: check
+        shell: pwsh
         run: |
           # workflow_dispatch always runs
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            if [[ "${{ inputs.arch }}" == "all" || "${{ inputs.arch }}" == "x64" ]]; then
-              echo "build-x64=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "build-x64=false" >> "$GITHUB_OUTPUT"
-            fi
-            if [[ "${{ inputs.arch }}" == "all" || "${{ inputs.arch }}" == "arm64" ]]; then
-              echo "build-arm64=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "build-arm64=false" >> "$GITHUB_OUTPUT"
-            fi
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "run=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            if ("${{ inputs.arch }}" -eq "all" -or "${{ inputs.arch }}" -eq "x64") {
+              "build-x64=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            } else {
+              "build-x64=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            }
+            if ("${{ inputs.arch }}" -eq "all" -or "${{ inputs.arch }}" -eq "arm64") {
+              "build-arm64=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            } else {
+              "build-arm64=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            }
+          }
           # PRs always run
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              echo "run=true" >> "$GITHUB_OUTPUT"
-              # Build both architectures for PRs
-              echo "build-x64=true" >> "$GITHUB_OUTPUT"
-              echo "build-arm64=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
+          elseif ("${{ github.event_name }}" -eq "pull_request") {
+            "run=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            # Build both architectures for PRs
+            "build-x64=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            "build-arm64=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            "run=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
 
   build-windows-cli-x64:
     name: Build Windows CLI (x64)
@@ -91,25 +93,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Report build results
+        shell: pwsh
         run: |
-          echo "## Windows CLI Build Results" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
+          "## Windows CLI Build Results" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
 
-          if [[ "${{ needs.build-windows-cli-x64.result }}" == "success" ]]; then
-            echo "✅ x64 build: SUCCESS" >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "${{ needs.build-windows-cli-x64.result }}" == "skipped" ]]; then
-            echo "⏭️ x64 build: SKIPPED" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "❌ x64 build: FAILED" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          if ("${{ needs.build-windows-cli-x64.result }}" -eq "success") {
+            "✅ x64 build: SUCCESS" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          } elseif ("${{ needs.build-windows-cli-x64.result }}" -eq "skipped") {
+            "⏭️ x64 build: SKIPPED" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          } else {
+            "❌ x64 build: FAILED" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          }
 
-          if [[ "${{ needs.build-windows-cli-arm64.result }}" == "success" ]]; then
-            echo "✅ ARM64 build: SUCCESS" >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "${{ needs.build-windows-cli-arm64.result }}" == "skipped" ]]; then
-            echo "⏭️ ARM64 build: SKIPPED" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "❌ ARM64 build: FAILED" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          if ("${{ needs.build-windows-cli-arm64.result }}" -eq "success") {
+            "✅ ARM64 build: SUCCESS" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          } elseif ("${{ needs.build-windows-cli-arm64.result }}" -eq "skipped") {
+            "⏭️ ARM64 build: SKIPPED" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          } else {
+            "❌ ARM64 build: FAILED" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          }
 
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Artifacts are available in the Actions tab." >> "$GITHUB_STEP_SUMMARY"
+          "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "Artifacts are available in the Actions tab." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
