@@ -123,6 +123,11 @@ jobs:
             "cargo_version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           }
 
+      - name: Add required packages
+        id: install-packages
+        run: |
+          winget install LLVM.LLVM
+
       - name: Patch workspace version
         if: steps.version.outputs.cargo_version != ''
         run: |
