@@ -52,16 +52,12 @@ jobs:
             else
               echo "build-arm64=false" >> "$GITHUB_OUTPUT"
             fi
-          # PRs only run if labeled with 'test-windows-build'
+          # PRs always run
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            if [[ "${{ contains(github.event.pull_request.labels.*.name, 'test-windows-build') }}" == "true" ]]; then
               echo "run=true" >> "$GITHUB_OUTPUT"
               # Build both architectures for PRs
               echo "build-x64=true" >> "$GITHUB_OUTPUT"
               echo "build-arm64=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "run=false" >> "$GITHUB_OUTPUT"
-            fi
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
           fi
