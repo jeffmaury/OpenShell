@@ -126,7 +126,7 @@ jobs:
       - name: Add required packages
         id: install-packages
         run: |
-          winget install LLVM.LLVM
+          winget install LLVM.LLVM --accept-source-agreements
 
       - name: Patch workspace version
         if: steps.version.outputs.cargo_version != ''
