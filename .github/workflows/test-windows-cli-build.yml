@@ -1,0 +1,119 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Test Windows CLI Build
+
+# Test workflow for building the Windows CLI binary.
+# Can be triggered manually or on PRs with the 'test-windows-build' label.
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: 'Architecture to build (x64, arm64, or all)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - x64
+          - arm64
+          - all
+  pull_request:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  should-run:
+    name: Check if workflow should run
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+      build-x64: ${{ steps.check.outputs.build-x64 }}
+      build-arm64: ${{ steps.check.outputs.build-arm64 }}
+    steps:
+      - id: check
+        run: |
+          # workflow_dispatch always runs
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            if [[ "${{ inputs.arch }}" == "all" || "${{ inputs.arch }}" == "x64" ]]; then
+              echo "build-x64=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "build-x64=false" >> "$GITHUB_OUTPUT"
+            fi
+            if [[ "${{ inputs.arch }}" == "all" || "${{ inputs.arch }}" == "arm64" ]]; then
+              echo "build-arm64=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "build-arm64=false" >> "$GITHUB_OUTPUT"
+            fi
+          # PRs only run if labeled with 'test-windows-build'
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            if [[ "${{ contains(github.event.pull_request.labels.*.name, 'test-windows-build') }}" == "true" ]]; then
+              echo "run=true" >> "$GITHUB_OUTPUT"
+              # Build both architectures for PRs
+              echo "build-x64=true" >> "$GITHUB_OUTPUT"
+              echo "build-arm64=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "run=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-windows-cli-x64:
+    name: Build Windows CLI (x64)
+    needs: should-run
+    if: needs.should-run.outputs.run == 'true' && needs.should-run.outputs.build-x64 == 'true'
+    uses: ./.github/workflows/rust-windows-cli-build.yml
+    with:
+      arch: x64
+      checkout-ref: ${{ github.sha }}
+      retention-days: 5
+    secrets: inherit
+
+  build-windows-cli-arm64:
+    name: Build Windows CLI (ARM64)
+    needs: should-run
+    if: needs.should-run.outputs.run == 'true' && needs.should-run.outputs.build-arm64 == 'true'
+    uses: ./.github/workflows/rust-windows-cli-build.yml
+    with:
+      arch: arm64
+      checkout-ref: ${{ github.sha }}
+      retention-days: 5
+    secrets: inherit
+
+  summary:
+    name: Build Summary
+    needs: [should-run, build-windows-cli-x64, build-windows-cli-arm64]
+    if: always() && needs.should-run.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report build results
+        run: |
+          echo "## Windows CLI Build Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${{ needs.build-windows-cli-x64.result }}" == "success" ]]; then
+            echo "✅ x64 build: SUCCESS" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "${{ needs.build-windows-cli-x64.result }}" == "skipped" ]]; then
+            echo "⏭️ x64 build: SKIPPED" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ x64 build: FAILED" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ "${{ needs.build-windows-cli-arm64.result }}" == "success" ]]; then
+            echo "✅ ARM64 build: SUCCESS" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "${{ needs.build-windows-cli-arm64.result }}" == "skipped" ]]; then
+            echo "⏭️ ARM64 build: SKIPPED" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ ARM64 build: FAILED" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Artifacts are available in the Actions tab." >> "$GITHUB_STEP_SUMMARY"
