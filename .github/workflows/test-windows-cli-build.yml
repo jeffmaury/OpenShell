@@ -73,6 +73,7 @@ jobs:
       arch: x64
       checkout-ref: ${{ github.sha }}
       retention-days: 5
+      artifact-name: 'openshell'
     secrets: inherit
 
   build-windows-cli-arm64:
@@ -84,6 +85,7 @@ jobs:
       arch: arm64
       checkout-ref: ${{ github.sha }}
       retention-days: 5
+      artifact-name: 'openshell'
     secrets: inherit
 
   summary:
