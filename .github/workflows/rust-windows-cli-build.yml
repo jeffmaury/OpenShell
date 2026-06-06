@@ -54,7 +54,7 @@ defaults:
 jobs:
   rust-windows-cli-build:
     name: cli (windows-${{ inputs.arch }})
-    runs-on: ${{ inputs.arch == 'arm64' && 'windows-latest-arm64' || 'windows-latest' }}
+    runs-on: ${{ inputs.arch == 'arm64' && 'windows-11-arm64' || 'windows-latest' }}
     timeout-minutes: 60
     env:
       ARCH: ${{ inputs.arch }}
