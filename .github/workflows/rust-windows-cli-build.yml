@@ -144,8 +144,6 @@ jobs:
       - name: Build ${{ steps.target.outputs.binary }}.exe (${{ steps.target.outputs.target }})
         env:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
-          # z3 needs C++ standard library on Windows
-          CXXSTDLIB: "msvc"
         run: |
           $ErrorActionPreference = 'Stop'
           $args = @(
