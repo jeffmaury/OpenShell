@@ -133,6 +133,29 @@ jobs:
           fi
           exit 0
 
+  rust-windows:
+    name: Rust (Windows x64)
+    needs: pr_metadata
+    if: needs.pr_metadata.outputs.should_run == 'true'
+    continue-on-error: true
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Cache Rust target and registry
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
+        with:
+          shared-key: rust-checks-windows-x64
+
+      - name: Build
+        run: cargo build --release -p openshell-cli --target x86_64-pc-windows-msvc --features bundled-z3
+
+      - name: Smoke test
+        run: target/x86_64-pc-windows-msvc/release/openshell.exe --version
+
   python:
     name: Python (${{ matrix.runner }})
     needs: pr_metadata
