@@ -101,7 +101,7 @@ futures = "0.3"
 bytes = "1"
 pin-project-lite = "0.2"
 tokio-stream = "0.1"
-protobuf-src = "1.1.0"
+protobuf-src = { git = "https://github.com/MaterializeInc/rust-protobuf-native", rev = "refs/pull/32/head" }
 url = "2"
 
 # Database
